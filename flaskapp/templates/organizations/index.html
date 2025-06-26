@@ -34,7 +34,9 @@
   </div>
 
   <!-- Page content -->
+  
   <div class="container-fluid mt--6">
+      {% if not current_user.is_admin%}
       <div class="row">
         <div class="col">
           <div class="card">
@@ -130,6 +132,7 @@
           </div>
         </div>
       </div>
+      {% endif%}
    
     
     <!-- Dark table -->
