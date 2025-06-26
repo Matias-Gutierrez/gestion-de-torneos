@@ -59,12 +59,11 @@ def register():
 
         name = request.form['name']
         email = request.form['email']
-
-        # Check usename exists
-        user = User.query.filter_by(name=name).first()
-        if user:
+        password = request.form['password']
+        # Check size of the password < 8 characters
+        if len(password) < 8 or len(password) > 16:
             return render_template('authentication/register.html',
-                                   msg='Username already registered',
+                                   msg='La contraseña debe tener al menos 8 caracteres y menos de 16 caracteres',
                                    success=False,
                                    form=create_account_form)
 
@@ -72,7 +71,7 @@ def register():
         user = User.query.filter_by(email=email).first()
         if user:
             return render_template('authentication/register.html',
-                                   msg='Email already registered',
+                                   msg='El email ya esta registrado',
                                    success=False,
                                    form=create_account_form)
 
