@@ -144,6 +144,10 @@ class ActivityService:
             activity = Activity.query.get_or_404(activity_id)
         else:
             activity = Activity()
+            #  Check if name is already in use
+            existing_activity = Activity.query.filter_by(name=form_data['name']).first()
+            if existing_activity:
+                raise ValueError('El nombre de la actividad ya está en uso.')
             db.session.add(activity)
 
         activity.name = form_data['name']
