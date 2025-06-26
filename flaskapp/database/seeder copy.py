@@ -16,9 +16,9 @@ from flaskapp.database.models import (
 
 # Configuración inicial
 fake = Faker('es_CL')
-NUM_USERS = 400 # Número total de usuarios a crear
+NUM_USERS = 200 # Número total de usuarios a crear
 # Para pruebas, se crean 5 administradores y el resto son usuarios normales
-NUM_ORGANIZATIONS = 5
+NUM_ORGANIZATIONS = 2
 NUM_ACTIVITIES = 5
 PASSWORD = "password1" # Contraseña común para desarrollo
 
@@ -44,23 +44,16 @@ def seed_database(app):
             activities = create_activities(NUM_ACTIVITIES)
 
             print(f"Generando {NUM_USERS} usuarios...")
-            generated_users = create_users(NUM_USERS)
-            # Acceso a los datos:
-            admin_principal = generated_users['admin_user']  # admin@test.com
-            admins_adicionales = generated_users['admins']  # 4 admins aleatorios
-            usuarios_aleatorios = generated_users['random_users']  # usuarios normales
-            usuarios_especificos = generated_users['specific_users']  # organizador, líder, jugador, árbitro
+            users, admins = create_users(NUM_USERS)
 
             print(f"Generando {NUM_ORGANIZATIONS} organizaciones...")
-            organizations = create_organizations(NUM_ORGANIZATIONS, admins_adicionales, admin_principal)
+            organizations = create_organizations(NUM_ORGANIZATIONS, admins)
             
             print("Asignando miembros a las organizaciones...")
-            organization_members = assign_members_to_organizations(organizations, usuarios_aleatorios, usuarios_especificos)
-            all_memberships = organization_members['all_memberships']
-            specific_memberships = organization_members['specific_memberships'] 
+            organization_members = assign_members_to_organizations(organizations, users)
 
             print("Generando eventos y torneos...")
-            create_events_and_tournaments(organizations, activities, all_memberships, specific_memberships)
+            create_events_and_tournaments(organizations, activities, organization_members)
 
             # 4. Confirmar todos los cambios en la base de datos
             db.session.commit()
@@ -120,109 +113,38 @@ def seed_master_data():
     
     db.session.flush()
 
-def create_users(num_random_users):
-    """
-    Crea usuarios específicos y aleatorios.
-    Retorna:
-    - admin_user: el usuario admin@test.com (único admin específico)
-    - admins: lista de 4 usuarios admin adicionales generados aleatoriamente
-    - random_users: usuarios no-admin generados aleatoriamente
-    - specific_users: usuarios específicos de la organización
-    """
-    # 1. Crear el admin específico
-    specific_admin_user = User(
-        name="Admin Principal",
-        email="admin@test.com",
-        password=PASSWORD,
-        profile_picture="https://randomuser.me/api/portraits/men/0.jpg",
-        is_admin=True,
-        created_at=fake.date_time_between(start_date='-2y', end_date='now')
-    )
-    db.session.add(specific_admin_user)
-
-    # 2. Crear usuarios específicos de la organización (no son admins)
-    specific_users = [
-        User(
-            name="Organizador de Organización de Prueba",
-            email="organizador@test.com",
-            password=PASSWORD,
-            profile_picture="https://randomuser.me/api/portraits/men/1.jpg",
-            is_admin=False,
-            created_at=fake.date_time_between(start_date='-2y', end_date='now')
-        ),
-        User(
-            name="Líder de Equipo",
-            email="lider@test.com",
-            password=PASSWORD,
-            profile_picture="https://randomuser.me/api/portraits/women/2.jpg",
-            is_admin=False,
-            created_at=fake.date_time_between(start_date='-2y', end_date='now')
-        ),
-        User(
-            name="Jugador Principal",
-            email="jugador@test.com",
-            password=PASSWORD,
-            profile_picture="https://randomuser.me/api/portraits/men/3.jpg",
-            is_admin=False,
-            created_at=fake.date_time_between(start_date='-2y', end_date='now')
-        ),
-        User(
-            name="Árbitro Oficial",
-            email="arbitro@test.com",
-            password=PASSWORD,
-            profile_picture="https://randomuser.me/api/portraits/women/4.jpg",
-            is_admin=False,
-            created_at=fake.date_time_between(start_date='-2y', end_date='now')
-        )
-    ]
+def create_users(num_users):
+    """Genera usuarios y los divide en administradores y usuarios normales."""
     
-    for user in specific_users:
-        db.session.add(user)
-
-    # 3. Crear 4 admins aleatorios adicionales
+    users = []
     admins = []
-    for i in range(1, 5):
-        user = User(
-            name=f"Admin Aleatorio {i}",
-            email=f"admin_{i}@test.com",
-            password=PASSWORD,
-            profile_picture=f"https://randomuser.me/api/portraits/{'women' if i % 2 == 0 else 'men'}/{i%100}.jpg",
-            is_admin=True,
-            created_at=fake.date_time_between(start_date='-2y', end_date='now')
-        )
-        db.session.add(user)
-        admins.append(user)
+    
+    for i in range(1, num_users + 1):
+        is_admin = i <= 5 # Los primeros 5 son administradores
 
-    # 4. Crear usuarios aleatorios no-admin
-    random_users = []
-    for i in range(1, num_random_users + 1):
-
+        # Nombre y foto de perfil según el género
         if i % 2 == 0:
             f_name = fake.name_female()
-            f_profile_pic = f"https://randomuser.me/api/portraits/women/{i % 60}.jpg"
+            f_profile_pic = f"https://randomuser.me/api/portraits/women/{i % 100}.jpg"
         else:
             f_name = fake.name_male()
-            f_profile_pic = f"https://randomuser.me/api/portraits/men/{i % 60}.jpg"
-
+            f_profile_pic = f"https://randomuser.me/api/portraits/men/{i % 100}.jpg"
+            
         user = User(
             name=f_name,
-            email=f"random_{i}@test.com",
+            email=f"usuario{i}@{fake.domain_name()}",
             password=PASSWORD,
             profile_picture=f_profile_pic,
-            is_admin=False,
+            is_admin=is_admin,
             created_at=fake.date_time_between(start_date='-2y', end_date='now')
         )
         db.session.add(user)
-        random_users.append(user)
-
+        users.append(user)
+        if is_admin:
+            admins.append(user)
+    
     db.session.flush()
-
-    return {
-        'admin_user': specific_admin_user,
-        'admins': admins,  # 4 admins aleatorios adicionales
-        'random_users': random_users,
-        'specific_users': specific_users  # lista de User objects
-    }
+    return users, admins
 
 def create_activities(num_activities):
     """Genera actividades de ejemplo."""
@@ -246,28 +168,13 @@ def create_activities(num_activities):
     db.session.flush()
     return activities
 
-def create_organizations(num_orgs, admins, admin_principal):
-    """Genera organizaciones, asignando un administrador como creador.
-    Incluye una organización especial 'Organización de Prueba' con el admin principal.
-    """
+def create_organizations(num_orgs, admins):
+    """Genera organizaciones, asignando un administrador como creador."""
     orgs = []
     org_names = set()
-    
-    # Primero creamos la organización especial
-    test_org = Organization(
-        name="Organización de Prueba",
-        description="Organización especial para propósitos de prueba del sistema",
-        creator=admin_principal,
-        created_at=fake.date_time_between(start_date='-1y', end_date='-6m')
-    )
-    db.session.add(test_org)
-    orgs.append(test_org)
-    
-    # Generamos nombres únicos para las demás organizaciones
-    while len(org_names) < num_orgs:  # Restamos 1 por la org especial
+    while len(org_names) < num_orgs:
         org_names.add(f"{fake.company()} eSports")
 
-    # Creamos las organizaciones normales
     for name in org_names:
         org = Organization(
             name=name,
@@ -281,39 +188,22 @@ def create_organizations(num_orgs, admins, admin_principal):
     db.session.flush()
     return orgs
 
-def assign_members_to_organizations(organizations, users, specific_users):
-    """Asigna usuarios a organizaciones, definiendo roles.
-    Retorna:
-    - all_memberships: Todas las membresías creadas
-    - specific_memberships: Dict con las membresías de usuarios específicos {email: membership}
-    """
+def assign_members_to_organizations(organizations, users):
+    """Asigna usuarios a organizaciones, definiendo roles."""
     all_memberships = []
-    specific_memberships = {}  # Diccionario para rastrear membresías específicas
-    
     for org in organizations:
-        print(org, flush=True)
-        # Asignar miembros aleatorios (75-300)
+        # Asignar entre 75 y 300 miembros
         potential_members = [u for u in users if u.id != org.creator.id]
         num_members = random.randint(75, 300)
         members_to_add = random.sample(potential_members, min(num_members, len(potential_members)))
         
-        # Añadir usuarios específicos SOLO a la Organización de Prueba
-        if org.name == "Organización de Prueba":
-            members_to_add.extend(specific_users)
-        
         first_is_organizer = True
         for user in members_to_add:
-            if user.is_admin:
-                continue
-        
-            # Determinar rol
-            if user in specific_users:
-                is_organizer = (user.email == "organizador@test.com")  # Solo el organizador es True
-            else:
-                is_organizer = first_is_organizer or (random.random() < 0.1)
+            if first_is_organizer: 
+                is_organizer = True
                 first_is_organizer = False
-            
-            # Crear membresía
+            else:
+                is_organizer = random.random() < 0.1
             membership = OrganizationMember(
                 organization=org,
                 user=user,
@@ -323,36 +213,16 @@ def assign_members_to_organizations(organizations, users, specific_users):
             db.session.add(membership)
             all_memberships.append(membership)
             
-            # Guardar referencia si es usuario específico
-            if user in specific_users:
-                specific_memberships[user.email] = membership
-    
     db.session.flush()
-    return {
-        'all_memberships': all_memberships,
-        'specific_memberships': specific_memberships
-    }
+    return all_memberships
 
-def create_events_and_tournaments(organizations, activities, all_memberships, specific_memberships):
+def create_events_and_tournaments(organizations, activities, all_memberships):
     """Crea eventos y torneos para cada organización."""
     # Obtener estados necesarios
     event_status_planned = db.session.query(EventStatus).filter_by(code='PLANNED').one()
-
     tourney_status_reg_open = db.session.query(TournamentStatus).filter_by(code='REGISTRATION_OPEN').one()
     tourney_status_completed = db.session.query(TournamentStatus).filter_by(code='COMPLETED').one()
     tourney_status_cancelled = db.session.query(TournamentStatus).filter_by(code='CANCELLED').one()
-
-    # Identificar la organización de prueba
-    test_org = next((org for org in organizations if org.name == "Organización de Prueba"), None)
-    
-    # Filtrar miembros específicos que pertenecen a la organización de prueba
-    test_org_specific_members = {}
-    if test_org:
-        test_org_specific_members = {
-            email: membership 
-            for email, membership in specific_memberships.items() 
-            if membership.organization_id == test_org.id
-        }
 
     # Mapear organización a sus miembros
     org_member_map = {}
@@ -368,9 +238,9 @@ def create_events_and_tournaments(organizations, activities, all_memberships, sp
         if not organizers:
             continue
 
-        # Crear 2-3 eventos por organización
+        # Crear 1-3 eventos por organización
         used_event_names = set()
-        for _ in range(random.randint(2, 3)):
+        for _ in range(random.randint(1, 3)):
             while True:
                 event_name = f"Evento {fake.word().capitalize()} de {fake.historic_people_street_name()}"
                 if event_name not in used_event_names:
@@ -394,19 +264,10 @@ def create_events_and_tournaments(organizations, activities, all_memberships, sp
         
         db.session.flush()
 
-        # Pasar los miembros específicos solo si es la org de prueba
-        current_specific_members = test_org_specific_members if org == test_org else None
-        
-        create_tournament_variants(
-            org,
-            activities,
-            organizers,
-            tourney_status_reg_open,
-            tourney_status_completed,
-            tourney_status_cancelled,
-            org_members,
-            current_specific_members
-        )
+        # Crear diferentes tipos de torneos
+        create_tournament_variants(org, activities, organizers, 
+                                 tourney_status_reg_open, tourney_status_completed, 
+                                 tourney_status_cancelled, org_members)
     
     db.session.flush()
 
@@ -435,21 +296,21 @@ def get_potential_players_for_tournament(tournament):
             
     return potential_players
 
-def create_tournament_variants(org, activities, organizers, status_open, status_completed, status_cancelled, org_members, specific_members):
+def create_tournament_variants(org, activities, organizers, status_open, status_completed, status_cancelled, org_members):
     """Crea diferentes variantes de torneos según los requerimientos."""
     print(f"  Creando torneos para la organización: {org.name} (ID: {org.id})")
     
     # 1. Torneos COMPLETADOS (2 por organización)
-    for _ in range(random.randint(1, 2)):
+    for _ in range(random.randint(0, 1)):
         create_completed_tournament(org, activities, organizers, status_completed, org_members)
     
     # 2. Torneos PENDIENTES (2-3 por organización)
-    if org.name == "Organización de Prueba":
-        print(org, flush=True)
-        create_pending_tournament(org, activities, organizers, status_open, org_members, specific_members)
-    for _ in range(random.randint(1, 2)):
+    for _ in range(random.randint(2, 3)):
         create_pending_tournament(org, activities, organizers, status_open, org_members)
-
+    
+    # 3. Torneos CANCELADOS (0-2 por organización)
+    for _ in range(random.randint(0, 1)):
+        create_cancelled_tournament(org, activities, organizers, status_cancelled, org_members)
 
 def create_completed_tournament(org, activities, organizers, status_completed, org_members):
     """Crea un torneo completado con bracket desde semifinales (4 equipos)."""
@@ -686,7 +547,7 @@ def create_completed_bracket(tournament, teams, end_date):
     
     db.session.add(final)
 
-def create_pending_tournament(org, activities, organizers, status_open, org_members, specific_members=None):
+def create_pending_tournament(org, activities, organizers, status_open, org_members):
     """Crea un torneo pendiente con fechas futuras."""
     print(f"    Creando torneo PENDIENTE para la organización: {org.name} (ID: {org.id})")
     
@@ -700,7 +561,7 @@ def create_pending_tournament(org, activities, organizers, status_open, org_memb
         organization=org,
         event=linked_event,
         activity=random.choice(activities),
-        name=f"Torneo de Prueba" if specific_members else f"Copa {fake.word().capitalize()} REGISTRATION_OPEN",
+        name=f"Copa {fake.word().capitalize()} REGISTRATION_OPEN",
         description=fake.paragraph(nb_sentences=4),
         max_teams=random.choice([4, 8, 16]),
         start_date=start_date,
@@ -712,7 +573,35 @@ def create_pending_tournament(org, activities, organizers, status_open, org_memb
     db.session.flush()
     
     # Crear participantes (equipos incompletos y árbitros)
-    create_tournament_participants(tournament, org_members, random.choice(organizers), specific_members)
+    create_tournament_participants(tournament, org_members, random.choice(organizers))
+
+def create_cancelled_tournament(org, activities, organizers, status_cancelled, org_members):
+    """Crea un torneo cancelado con fechas pasadas."""
+    print(f"    Creando torneo CANCELLED para la organización: {org.name} (ID: {org.id})")
+    
+    # Fechas pasadas (hace 1-6 meses)
+    start_date = fake.date_time_between(start_date='-6m', end_date='-1m')
+    end_date = start_date + timedelta(days=random.randint(1, 14))
+    
+    linked_event = random.choice(org.events) if org.events and random.random() < 0.7 else None
+    
+    tournament = Tournament(
+        organization=org,
+        event=linked_event,
+        activity=random.choice(activities),
+        name=f"Copa {fake.word().capitalize()} CANCELLED",
+        description=fake.paragraph(nb_sentences=3),
+        max_teams=random.choice([4, 8, 16]),
+        start_date=start_date,
+        end_date=end_date,
+        status=status_cancelled,
+        creator=random.choice(organizers)
+    )
+    db.session.add(tournament)
+    db.session.flush()
+    
+    # Crear algunos participantes (pocos equipos, simular inscripciones incompletas)
+    create_limited_tournament_participants(tournament, org_members, random.choice(organizers))
 
 def create_limited_tournament_participants(tournament, org_members, organizer):
     """Crea participantes limitados para torneos cancelados usando jugadores elegibles."""
@@ -730,7 +619,7 @@ def create_limited_tournament_participants(tournament, org_members, organizer):
         create_teams_for_tournament(tournament, potential_players, num_teams_to_create, prefix="Team Cancelado")
 
 
-def create_referees_for_tournament(tournament, org_members, organizer, count_range=(2, 4), specific_referee=None):
+def create_referees_for_tournament(tournament, org_members, organizer, count_range=(2, 4)):
     """
     Crea árbitros para un torneo a partir de una lista de miembros de la organización.
     """
@@ -763,24 +652,11 @@ def create_referees_for_tournament(tournament, org_members, organizer, count_ran
             )
             db.session.add(referee)
 
-    if tournament.name == "Torneo de Prueba":
-        referee = TournamentReferee(
-            tournament=tournament,
-            user=specific_referee.user,  # Asignamos el objeto User.
-            assigned_by_user=organizer
-        )
-        db.session.add(referee)
-
-
-def create_tournament_participants(tournament, org_members, organizer, specific_members=None):
+def create_tournament_participants(tournament, org_members, organizer):
     """Puebla un torneo pendiente con árbitros y equipos usando jugadores elegibles."""
-    print(specific_members)
-
+    
     # 1. Asignar árbitros (sin cambios en esta parte)
-    if specific_members:
-        create_referees_for_tournament(tournament, org_members, organizer, count_range=(1,2), specific_referee=specific_members['arbitro@test.com'])
-    else:
-        create_referees_for_tournament(tournament, org_members, organizer, count_range=(1,2))
+    create_referees_for_tournament(tournament, org_members, organizer)
     db.session.flush()
 
     # 2. Obtener jugadores elegibles DESPUÉS de asignar árbitros

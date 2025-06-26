@@ -49,8 +49,10 @@ def login():
     if not current_user.is_authenticated:
         return render_template('authentication/login.html',
                                form=login_form)
-    return redirect(url_for('home_blueprint.index'))
-
+    else:
+        if current_user.is_admin:
+            return redirect(url_for('home_blueprint.index'))
+        return redirect(url_for('organizations_blueprint.index'))
 
 @auth_blueprint.route('/register', methods=['GET', 'POST'])
 def register():

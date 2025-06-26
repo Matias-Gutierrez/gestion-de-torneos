@@ -9,19 +9,21 @@
       <div class="col-9">
         <h1 class="display-2 text-white">{{ activity.name }}</h1>
         <p class="text-white mt-0 mb-5">{{ activity.description }}</p>
-        {% if activity.can_edit %}
+        
         <div class="mt-3">
+          {% if activity.can_edit %}
           <a href="{{ url_for('activities_blueprint.manage', activity_id=activity.id) }}" 
              class="btn btn-neutral">
             <i class="fas fa-cog mr-2"></i>Editar Actividad
           </a>
+          {% endif %}
+          <a href="{{ url_for('activities_blueprint.index') }}" 
+              class="btn btn-neutral">
+            <i class="fas fa-arrow-left mr-2"></i>Volver atrás
+          </a>
         </div>
-        {% endif %}
-        <a href="{{ url_for('activities_blueprint.index') }}" 
-            class="btn btn-neutral">
-          <i class="fas fa-arrow-left mr-2"></i>Volver atrás
-        </a>
       </div>
+
       <div class="col">
         <div class="row text-white">
           <p><strong>Categoría:</strong> {{ activity.category or 'N/A' }}</p>

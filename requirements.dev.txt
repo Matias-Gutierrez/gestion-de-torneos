@@ -11,3 +11,5 @@ waitress
 # Testing
 bcrypt
 faker 
+# Tests
+pytest
