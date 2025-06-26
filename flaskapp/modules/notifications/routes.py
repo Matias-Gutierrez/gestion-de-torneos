@@ -45,7 +45,7 @@ def mark_as_read(notification_id):
         return redirect(url_for('notifications_blueprint.index'))
     notification.is_read = True
     db.session.commit()
-    flash('Notificación marcada como leída.', 'success')
+    # flash('Notificación marcada como leída.', 'success')
 
     next_url = request.args.get('next')
     if next_url:
